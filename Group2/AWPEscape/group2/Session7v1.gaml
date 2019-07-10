@@ -52,12 +52,12 @@ global {
 
 	// Output the number of casualties
 	int casualties;
-	geometry bound_of_building;
+//	geometry bound_of_building;
 
 	init {
 		create road from: road_file;
 		create building from: buildings with: [type:: string(get("TYPE"))];
-		bound_of_building <- convex_hull(union(building where (each.type != "rescue")));
+//		bound_of_building <- convex_hull(union(building where (each.type != "rescue")));
 		//		create evacuation_point from:evac_points;
 		//		create hazard from: water_body;
 		create hazard {
@@ -83,7 +83,7 @@ global {
 	}
 
 	// Stop the simulation when everyone is either saved :) or dead :(
-	reflex stop_simu when: inhabitant all_match (each.saved or each.drowned) {
+	reflex stop_simu when: inhabitant all_match (each.saved or each.burnt) {
 		do pause;
 	}
 
@@ -222,7 +222,7 @@ species inhabitant skills: [moving] {
 
 // The state of the agent
 	bool alerted <- false;
-	bool drowned <- false;
+	bool burnt <- false;
 	bool saved <- false;
 
 	// How far (#m) they can perceive
@@ -236,9 +236,9 @@ species inhabitant skills: [moving] {
 	/*
 	 * Am I drowning ?
 	 */
-	reflex drown when: not (drowned or saved) {
-		if (first(hazard) covers self) {
-			drowned <- true;
+	reflex burnt when: not (burnt or saved) {
+		if (!dead((ground closest_to self)) and (ground closest_to self).burning) {
+			burnt <- true;
 			casualties <- casualties + 1;
 		}
 
@@ -247,7 +247,7 @@ species inhabitant skills: [moving] {
 	/*
 	 * Is there any danger around ?
 	 */
-	reflex perceive when: not (alerted or drowned)   { 
+	reflex perceive when: not (alerted or burnt)   { 
 //		ground g<-(ground where (!(dead(each)))where (each.burning)) closest_to self;
 //		write (ground at_distance perception_distance) where (!dead(each) and each.burning);
 //		if(g!=nil){				
@@ -262,7 +262,7 @@ species inhabitant skills: [moving] {
 	/*
 	 * When alerted people will try to go to the choosen exit point
 	 */
-	reflex evacuate when: alerted and not (drowned or saved) {
+	reflex evacuate when: alerted and not (burnt or saved) {
 		do goto target: safety_point on: road_network move_weights: road_weights;
 		if (current_edge != nil) {
 			road the_current_road <- road(current_edge);
@@ -276,11 +276,12 @@ species inhabitant skills: [moving] {
 	 */
 	reflex escape when: not (saved) and location distance_to safety_point < 2 #m {
 		saved <- true;
+		location<-any_location_in(safety_point);
 		alerted <- false;
 	}
 
 	aspect default {
-		draw drowned ? cross(4, 0.2) : circle(1 #m) color: drowned ? #black : (alerted ? #red : #green);
+		draw burnt ? cross(4, 0.2) : circle(1 #m) color: burnt ? #black : (alerted ? #red : #green);
 	}
 
 }
@@ -364,7 +365,7 @@ grid ground width: 100 height: 100 neighbors: 4{
 
 	aspect default {
 		if (burning) {
-			draw shape color: #red at: location;
+			draw shape texture:("../images/fire1.gif") color: #red ;
 		} else {
 		}
 
@@ -382,15 +383,14 @@ experiment my_experiment {
 	parameter "Time before hazard" var: time_before_hazard init: 5 min: 0 max: 10 unit: #mn category: "Hazard";
 	parameter "Number of people" var: nb_of_people init: 500 min: 100 max: 20000 category: "Initialization";
 	output {
-		display my_display type: opengl refresh: every(1 #cycle) {
-			species road;
-//			species evacuation_point;
+		display my_display type: opengl   {
+			species road; 
 			species building;
-			species ground position: {0, 0, 0.001} transparency:0.5;
 			species hazard position: {0, 0, 0.003};
 			species inhabitant;
+			species ground  position: {0, 0, 0.002}  transparency:0.5;
 		}
-		//		monitor "Number of casualties" value:casualties;
+				monitor "Number of casualties" value:casualties;
 	}
 
 }
