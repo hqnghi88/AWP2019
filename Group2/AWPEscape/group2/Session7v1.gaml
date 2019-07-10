@@ -197,19 +197,9 @@ species hazard {
 			temperature<-1000.0;
 		}
 	}
-	/*
-	 * The shape the represent the water expend every cycle to mimic a (big) wave
-	 */
-//	reflex expand {//when:catastrophe_date < current_date {
-	//		if(not(triggered)) {triggered <- true;}
-	////		shape <- shape buffer (flood_front_speed#m/#mn * step) intersection world;
-	//		size<-size+5;
-	////		shape<- circle(size) intersection (world.shape - union(building))  ;
-	//		shape<-circle(size) intersection bound_of_building;
-	//	}
+
 	aspect default {
-//		draw shape at: loc color: #red texture: ("../images/fire.gif");
-		draw circle(2)  color: #red ;
+		draw circle(1)  color: #red ;
 	}
 
 }
@@ -352,7 +342,7 @@ grid ground width: 100 height: 100 neighbors: 4{
 	reflex fire_spreading {
 		float avg_temp <- mean(((neighbors+self) where (!dead(each))) accumulate (each.temperature));
 		temperature <- avg_temp;
-//		write temperature;
+
 			if (temperature > 100) {
 				burning <- true;
 			}
