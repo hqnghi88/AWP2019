@@ -374,13 +374,20 @@ experiment my_experiment {
 	parameter "Number of people" var: nb_of_people init: 500 min: 100 max: 20000 category: "Initialization";
 	output {
 		display my_display type: opengl   {
+			graphics legend
+            {
+				draw "3rd floor" color: #black font: font("SansSerif", 20, #bold) at: {100#px, 40#px } perspective:false;
+				draw "2nd floor" color: #black font: font("SansSerif", 20, #bold) at: {100#px, 240#px } perspective:false;
+				draw "1st floor" color: #black font: font("SansSerif", 20, #bold) at: {100#px, 440#px } perspective:false;
+				draw "Rescue schelter" color: #black font: font("SansSerif", 20, #bold) at: {20#px, 700#px } perspective:false;
+			}
 			species road; 
 			species building;
 			species hazard position: {0, 0, 0.003};
 			species inhabitant;
 			species ground  position: {0, 0, 0.002}  transparency:0.5;
 		}
-				monitor "Number of casualties" value:casualties;
+//				monitor "Number of casualties" value:casualties;
 	}
 
 }
