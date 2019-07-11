@@ -35,23 +35,27 @@ global {
 	init {
 		
 		//clean data, with the given options
-		list<geometry> clean_lines <- clean_data ? clean_network(road_shapefile.contents,tolerance,split_lines,reduce_to_main_connected_components) : road_shapefile.contents;
-		
-		//create road from the clean lines
-		create road from: clean_lines;
-		
-		//build a network from the road agents
-		graph road_network_clean <- as_edge_graph(road);
-		
-		//computed the connected components of the graph (for visualization purpose)
-		connected_components <- list<list<point>>(connected_components_of(road_network_clean));
-		loop times: length(connected_components) {colors << rnd_color(255);}
-		save road to:"../includes/building_environments.shp" type:shp;
+//		list<geometry> clean_lines <- clean_data ? clean_network(road_shapefile.contents,tolerance,split_lines,reduce_to_main_connected_components) : road_shapefile.contents;
+//		
+//		//create road from the clean lines
+//		create road from: clean_lines;
+//		
+//		//build a network from the road agents
+//		graph road_network_clean <- as_edge_graph(road);
+//		
+//		//computed the connected components of the graph (for visualization purpose)
+//		connected_components <- list<list<point>>(connected_components_of(road_network_clean));
+//		loop times: length(connected_components) {colors << rnd_color(255);}
+		create road from:road_shapefile;
+    }
+    reflex ss{    	
+		save road to:"../includes/building_environments.shp" attributes:["COLOR"::mycolor] type:shp;
     }
 }
 
 //Species to represent the roads
 species road {
+	string mycolor;
 	aspect default {
 		draw shape color: #black;
 	}
@@ -65,18 +69,18 @@ experiment clean_network type: gui {
 //	}
 	output {
 		display network {
-			 overlay position: { 10, 100 } size: { 1000 #px, 60 #px } background: # black transparency: 0.5 border: #black rounded: true
-            {
-				draw legend color: #white font: font("SansSerif", 20, #bold) at: {40#px, 40#px, 1 };
-			}
+//			 overlay position: { 10, 100 } size: { 1000 #px, 60 #px } background: # black transparency: 0.5 border: #black rounded: true
+//            {
+//				draw legend color: #white font: font("SansSerif", 20, #bold) at: {40#px, 40#px, 1 };
+//			}
 			species road ;
-			graphics "connected components" {
-				loop i from: 0 to: length(connected_components) - 1 {
-					loop j from: 0 to: length(connected_components[i]) - 1 {
-						draw circle(2) color: colors[i] at: connected_components[i][j];	
-					}
-				}
-			}
+//			graphics "connected components" {
+//				loop i from: 0 to: length(connected_components) - 1 {
+//					loop j from: 0 to: length(connected_components[i]) - 1 {
+//						draw circle(2) color: colors[i] at: connected_components[i][j];	
+//					}
+//				}
+//			}
 		}
 	}
 }
