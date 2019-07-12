@@ -27,12 +27,24 @@ global {
 	// To initialize perception distance of inhabitant
 	float min_perception_distance <- 10.0;
 	float max_perception_distance <- 30.0;
+	
+	
+	
 	//to alert the others
 	float alert_distance <- 5.0 #m;
-
 	// to decide if helping or not
-	float patients_distance <- 10.0 #m;
-
+	float patients_distance <- 2.0 #m;
+	bool try_to_save_the_farthest<-true;
+/*alert_distance 	patients_distance 	try_to_save_the_farthest	casual	simulation duration (step)
+ * 1 				1 					false 						109   	540
+ * 1 				1 					true  						115   	541 
+ * 10 				1 					false 						94		585
+ * 10 				1 					true 						92    	455
+ * 10 				5 					false 						46    	548
+ * 10 				5 					true 						46    	539
+ * 10 				10 					false 						39    	469
+ * 10 				10 					false 						57    	546
+ */
 	// Represents the capacity of a road indicated as: number of inhabitant per #m of road
 	float road_density;
 
@@ -56,6 +68,9 @@ global {
 
 	// Output the number of casualties
 	int casualties;
+	
+//	float average_speed <- 0.0 update: mean(inhabitant where (!each.burnt and each.type=0) collect each.real_speed)*3.6;
+	
 	//	geometry bound_of_building;
 	init {
 		create road from: road_file;
@@ -64,7 +79,7 @@ global {
 		//		create evacuation_point from:evac_points;
 		//		create hazard from: water_body;
 		create hazard {
-			location <- any_location_in(any(building where (each.type = "floor3")));
+			location <- ((building where (each.type = "floor3"))[1]).location;
 		}
 
 		create inhabitant number: nb_of_people {
@@ -94,6 +109,9 @@ global {
 
 	}
 
+//reflex ss{
+//	save road to:"../includes/clean_road.shp" type:shp;
+//}
 	// Stop the simulation when everyone is either saved :) or dead :(
 	reflex stop_simu when: inhabitant all_match (each.saved or each.burnt) {
 		do pause;
@@ -206,7 +224,7 @@ species hazard {
 
 	reflex fire {
 		ask (ground overlapping self) {
-			temperature <- 1000.0;
+			temperature <- temperature+10.0;
 		}
 
 	}
@@ -244,7 +262,10 @@ species inhabitant skills: [moving] {
 	 * Am I burning ?
 	 */
 	reflex burnt when: not (burnt or saved) {
-		if (!dead((ground closest_to self)) and (ground closest_to self).burning) {
+		
+//		write ((ground at_distance 1#m) where (!dead(each))) where (each.burning);
+//		write first(ground overlapping self).burning; 
+		if (!dead(first(ground overlapping self)) and ( first(ground overlapping self).burning)) {
 			burnt <- true;
 			casualties <- casualties + 1;
 		}
@@ -265,11 +286,11 @@ species inhabitant skills: [moving] {
 			alerted <- true;
 		}
 		//		}
-		//list of patients that needs to be helped near to the normal people
 
 	}
 
 	reflex spreading_alert when: alerted and not (burnt or saved) {
+		//list of patients that needs to be helped near to the normal people
 		list<inhabitant> neighbors <- inhabitant at_distance alert_distance;
 		ask neighbors {
 			alerted <- true;
@@ -283,7 +304,7 @@ species inhabitant skills: [moving] {
 			has_reach_my_critical_patient <- true;
 		}
 
-		do goto target: my_critical_patients on: road_network move_weights: road_weights;
+		do goto target: my_critical_patients  recompute_path:false on: road_network move_weights: road_weights;
 		if (my_critical_patients != nil) and (location distance_to my_critical_patients < 0.5 #m) {
 			has_reach_my_critical_patient <- true;
 			saved <- false;
@@ -306,6 +327,7 @@ species inhabitant skills: [moving] {
 			}
 
 			if (!(my_critical_patients.burnt)) {
+				speed<-1#km/#h;
 				my_critical_patients.location <- location;
 			} else {
 				my_critical_patients <- nil;
@@ -313,7 +335,7 @@ species inhabitant skills: [moving] {
 
 		}
 
-		do goto target: safety_point on: road_network move_weights: road_weights;
+		do goto target: safety_point on: road_network recompute_path:false move_weights: road_weights;
 		if (current_edge != nil) {
 			road the_current_road <- road(current_edge);
 			if (!dead(the_current_road)) {
@@ -334,7 +356,7 @@ species inhabitant skills: [moving] {
 			if (my_critical_patients = nil) {
 				alerted <- true;
 				has_reach_my_critical_patient <- false;
-				my_critical_patients <- lst_patient closest_to self;
+				my_critical_patients <- try_to_save_the_farthest?  lst_patient farthest_to self:lst_patient closest_to self;
 				if (my_critical_patients != nil) {
 					my_critical_patients.is_helped <- true;
 				} else{
@@ -347,16 +369,6 @@ species inhabitant skills: [moving] {
 				alerted <- true;
 			}
 		}
-		//		if (has_reach_my_critical_patient) {
-		//			my_critical_patients.location <- location;
-		//			do goto target: safety_point on: road_network move_weights: road_weights;
-		//		} else {
-		//			do goto target: my_critical_patients on: road_network move_weights: road_weights;
-		//		}
-		//
-		//		if (location distance_to my_critical_patients < 1 #m) {
-		//			has_reach_my_critical_patient <- true;
-		//		}
 
 	}
 
@@ -367,6 +379,7 @@ species inhabitant skills: [moving] {
 		saved <- true;
 		location <- any_location_in(safety_point);
 		alerted <- false;
+		speed<-3#km/#h;
 		if (my_critical_patients != nil) {
 			my_critical_patients.alerted <- false;
 			my_critical_patients.saved <- true;
@@ -378,8 +391,7 @@ species inhabitant skills: [moving] {
 
 	aspect default {
 		draw burnt ? cross(2, 0.5) : (alerted ? circle(1 #m) : square(1 #m)) color: burnt ? #black : colors[type];
-		//		draw "" + type at: location font: font("Helvetica", 6, #bold);
-	}
+}
 
 }
 
@@ -432,17 +444,16 @@ species building {
 
 grid ground width: 100 height: 100 neighbors: 4 {
 	bool burning <- false;
-	float temperature <- 20.0;
-
+	float temperature <- 0.2; 
 	reflex fire_spreading {
 		float avg_temp <- mean(((neighbors + self) where (!dead(each))) accumulate (each.temperature));
 		temperature <- avg_temp;
-		if (temperature > 100) {
+		if (temperature > 1) {
 			burning <- true;
 		}
 
 		ask neighbors {
-			temperature <- avg_temp;
+			temperature <- avg_temp ;
 		}
 
 	}
@@ -450,7 +461,7 @@ grid ground width: 100 height: 100 neighbors: 4 {
 	aspect default {
 		if (burning) {
 			draw shape color: #red;
-		} else {
+		} else { 
 		}
 
 	}
@@ -459,33 +470,61 @@ grid ground width: 100 height: 100 neighbors: 4 {
 
 experiment my_experiment {
 	float minimum_cycle_duration <- 0.1;
-	parameter "Alert Strategy" var: the_alert_strategy init: "NONE" among: ["NONE", "STAGED", "SPATIAL", "EVERYONE"] category: "Alert";
-	parameter "Number of stages" var: nb_stages init: 6 category: "Alert";
-	parameter "Time alert buffer before hazard" var: time_after_last_stage init: 5 unit: #mn category: "Alert";
+//	parameter "Alert Strategy" var: the_alert_strategy init: "NONE" among: ["NONE", "SPATIAL", "EVERYONE"] category: "Alert";
+	parameter "Try to save farthest patient" var: try_to_save_the_farthest init: false ;
 	parameter "Road density index" var: road_density init: 6.0 min: 0.1 max: 10.0 category: "Congestion";
-	parameter "Speed of the flood front" var: flood_front_speed init: 5.0 min: 1.0 max: 30.0 unit: #m / #mn category: "Hazard";
-	parameter "Time before hazard" var: time_before_hazard init: 5 min: 0 max: 10 unit: #mn category: "Hazard";
 	parameter "Number of people" var: nb_of_people init: 500 min: 100 max: 20000 category: "Initialization";
 	output {
-		display my_display type: opengl background: #lightgray {
+		display my_display  type:opengl background:#lightgray{
 			graphics legend {
+				draw "Casualties: "+casualties color: #black font: font("SansSerif", 20, #bold) at: {500 #px, 40 #px} perspective: false;				
 				draw "3rd floor" color: #black font: font("SansSerif", 20, #bold) at: {100 #px, 40 #px} perspective: false;
 				draw "2nd floor" color: #black font: font("SansSerif", 20, #bold) at: {100 #px, 280 #px} perspective: false;
 				draw "1st floor" color: #black font: font("SansSerif", 20, #bold) at: {100 #px, 520 #px} perspective: false;
 				draw "Rescue schelter" color: #black font: font("SansSerif", 20, #bold) at: {20 #px, 700 #px} perspective: false;
 			}
 
+//			grid ground lines:#black;//elevation: temperature*10 transparency: 0.79 triangulation: true;
 			species road;
 			species building;
 			species inhabitant;
 			species hazard position: {0, 0, 0.003};
 			species ground position: {0, 0, 0.002} transparency: 0.25;
-		}
+
+		} 
+		
 
 		//		monitor "Number of casualties" value: casualties;
 	}
 
 }
 
-
+// This experiment explores two parameters with an exhaustive strategy,
+// repeating each simulation three times (the aggregated fitness correspond to the mean fitness), 
+// in order to find the best combination of parameters to minimize the number of infected people
+experiment exp_batch type: batch repeat: 2 until: inhabitant all_match (each.saved or each.burnt) {
+	parameter "Road density index" var:road_density init:6.0  category:"Congestion";
+	parameter "Speed of the flood front" var:flood_front_speed init:5.0  unit:#m/#mn category:"Hazard";
+	parameter "Number of people" var:nb_of_people init:500   category:"Initialization";	
+	parameter 'Try to save farthest patient:' var: try_to_save_the_farthest among: [ true,false ] ;
+	parameter 'Alert distance:' var: alert_distance min: 1.0 max: 10.0 step:1.0;
+	parameter 'Helping patient distance:' var: patients_distance min: 1.0 max: 10.0 step:1.0;
+	
+	method exhaustive minimize: casualties;
+	
+	reflex results {
+		save [the_alert_strategy,time_before_hazard,mean(simulations collect each.casualties)]  type: "csv" to: "resultsAgregated.csv" rewrite: false;
+		ask simulations {
+			save [the_alert_strategy,time_before_hazard,self.casualties]  type: "csv" to: "results.csv" rewrite: false;	
+		}		
+	}
+	//the permanent section allows to define a output section that will be kept during all the batch experiment
+	permanent {
+		display Comparison {
+			chart "casualties" type: series {
+				data "casualties" value: casualties style: spline color: #red ;
+			}
+		}	
+	}
+}
 
